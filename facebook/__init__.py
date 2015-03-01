@@ -120,8 +120,13 @@ class GraphAPI(object):
 
     def get_connections(self, id, connection_name, **args):
         """Fetchs the connections for given object."""
-        return self.request(
-            self.version + "/" + id + "/" + connection_name, args)
+        paging = args.pop("paging", False)
+        if paging:
+            return self._paginate(
+                self.version + "/" + id + "/" + connection_name, args)
+        else:
+            return self.request(
+                self.version + "/" + id + "/" + connection_name, args)
 
     def put_object(self, parent_object, connection_name, **data):
         """Writes the given object to the graph, connected to the given parent.
@@ -222,7 +227,23 @@ class GraphAPI(object):
         except Exception:
             raise GraphAPIError("API version number not available")
 
-    def raw_request(
+    def _paginate(
+            self, path, args=None):
+        """Generator function for API responses with embedded paging
+        URLs."""
+
+        response = self.request(path, args)
+        yield response
+
+        while(True):
+            nextPage = response.get("paging", {}).get("next")
+            if not nextPage:
+                break
+
+            response = self._raw_request(nextPage)
+            yield response
+
+    def _raw_request(
             self, url, args=None, post_args=None, files=None, method="GET"):
         """Fetches the given url.
 
@@ -278,8 +299,8 @@ class GraphAPI(object):
             self, path, args=None, post_args=None, files=None, method="GET"):
         """Fetches the given path in the Graph API."""
 
-        return self.raw_request("https://graph.facebook.com/" + path,
-                                args, post_args, files, method)
+        return self._raw_request("https://graph.facebook.com/" + path,
+                                 args, post_args, files, method)
 
     def fql(self, query):
         """FQL query.
