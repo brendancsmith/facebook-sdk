@@ -223,7 +223,7 @@ class GraphAPI(object):
             raise GraphAPIError("API version number not available")
 
     def request(
-            self, path, args=None, post_args=None, files=None, method=None):
+            self, path, args=None, post_args=None, files=None, method="GET"):
         """Fetches the given path in the Graph API.
 
         We translate args to a valid query string. If post_args is
@@ -240,7 +240,7 @@ class GraphAPI(object):
                 args["access_token"] = self.access_token
 
         try:
-            response = requests.request(method or "GET",
+            response = requests.request(method,
                                         "https://graph.facebook.com/" +
                                         path,
                                         timeout=self.timeout,
