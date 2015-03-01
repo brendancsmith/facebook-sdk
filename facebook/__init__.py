@@ -222,15 +222,16 @@ class GraphAPI(object):
         except Exception:
             raise GraphAPIError("API version number not available")
 
-    def request(
-            self, path, args=None, post_args=None, files=None, method="GET"):
-        """Fetches the given path in the Graph API.
+    def raw_request(
+            self, url, args=None, post_args=None, files=None, method="GET"):
+        """Fetches the given url.
 
         We translate args to a valid query string. If post_args is
         given, we send a POST request to the given path with the given
         arguments.
 
         """
+
         args = args or {}
 
         if self.access_token:
@@ -241,8 +242,7 @@ class GraphAPI(object):
 
         try:
             response = requests.request(method,
-                                        "https://graph.facebook.com/" +
-                                        path,
+                                        url,
                                         timeout=self.timeout,
                                         params=args,
                                         data=post_args,
@@ -273,6 +273,13 @@ class GraphAPI(object):
         if result and isinstance(result, dict) and result.get("error"):
             raise GraphAPIError(result)
         return result
+
+    def request(
+            self, path, args=None, post_args=None, files=None, method="GET"):
+        """Fetches the given path in the Graph API."""
+
+        return self.raw_request("https://graph.facebook.com/" + path,
+                                args, post_args, files, method)
 
     def fql(self, query):
         """FQL query.
