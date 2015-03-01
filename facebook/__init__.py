@@ -120,8 +120,13 @@ class GraphAPI(object):
 
     def get_connections(self, id, connection_name, **args):
         """Fetchs the connections for given object."""
-        return self.request(
-            self.version + "/" + id + "/" + connection_name, args)
+        paging = args.pop("paging", False)
+        if paging:
+            return self._paged_request(
+                self.version + "/" + id + "/" + connection_name, args)
+        else:
+            return self.request(
+                self.version + "/" + id + "/" + connection_name, args)
 
     def put_object(self, parent_object, connection_name, **data):
         """Writes the given object to the graph, connected to the given parent.
@@ -222,15 +227,56 @@ class GraphAPI(object):
         except Exception:
             raise GraphAPIError("API version number not available")
 
-    def request(
-            self, path, args=None, post_args=None, files=None, method=None):
-        """Fetches the given path in the Graph API.
+    def paginate(self, pagedResult):
+        """
+        For paged results, the Facebook API produces dictionaries in
+        the form of:
+                {'paging': {'previous': ..., 'next': ...},
+                 'data': {...}}
+
+        These dictionaries are not necessarily the top-level results.
+        For instance, an inbox result will be a dictionary where this
+        type of dictionary is the value for the inbox's 'comments' key.
+
+        This function takes any such paged result and creates
+        a generator which yields the 'data' values.
+        """
+
+        data = pagedResult.get("data")
+
+        if not data:  # result is not actually paged
+            yield pagedResult
+            return
+
+        yield data
+
+        while(True):
+            nextPage = pagedResult.get("paging", {}).get("next")
+            if not nextPage:
+                break
+
+            pagedResult = self._raw_request(nextPage)
+            yield pagedResult.get('data')
+
+    def _paged_request(
+            self, path, args=None):
+        """
+        Generator function for API responses with embedded paging URLs.
+        """
+
+        response = self.request(path, args)
+        return self.paginate(response)
+
+    def _raw_request(
+            self, url, args=None, post_args=None, files=None, method="GET"):
+        """
+        Fetches the given url.
 
         We translate args to a valid query string. If post_args is
         given, we send a POST request to the given path with the given
         arguments.
-
         """
+
         args = args or {}
 
         if self.access_token:
@@ -240,9 +286,8 @@ class GraphAPI(object):
                 args["access_token"] = self.access_token
 
         try:
-            response = requests.request(method or "GET",
-                                        "https://graph.facebook.com/" +
-                                        path,
+            response = requests.request(method,
+                                        url,
                                         timeout=self.timeout,
                                         params=args,
                                         data=post_args,
@@ -273,6 +318,13 @@ class GraphAPI(object):
         if result and isinstance(result, dict) and result.get("error"):
             raise GraphAPIError(result)
         return result
+
+    def request(
+            self, path, args=None, post_args=None, files=None, method="GET"):
+        """Fetches the given path in the Graph API."""
+
+        return self._raw_request("https://graph.facebook.com/" + path,
+                                 args, post_args, files, method)
 
     def fql(self, query):
         """FQL query.
