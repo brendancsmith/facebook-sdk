@@ -122,7 +122,7 @@ class GraphAPI(object):
         """Fetchs the connections for given object."""
         paging = args.pop("paging", False)
         if paging:
-            return self._paginate(
+            return self._paged_request(
                 self.version + "/" + id + "/" + connection_name, args)
         else:
             return self.request(
@@ -227,30 +227,54 @@ class GraphAPI(object):
         except Exception:
             raise GraphAPIError("API version number not available")
 
-    def _paginate(
-            self, path, args=None):
-        """Generator function for API responses with embedded paging
-        URLs."""
+    def paginate(self, pagedResult):
+        """
+        For paged results, the Facebook API produces dictionaries in
+        the form of:
+                {'paging': {'previous': ..., 'next': ...},
+                 'data': {...}}
 
-        response = self.request(path, args)
-        yield response
+        These dictionaries are not necessarily the top-level results.
+        For instance, an inbox result will be a dictionary where this
+        type of dictionary is the value for the inbox's 'comments' key.
+
+        This function takes any such paged result and creates
+        a generator which yields the 'data' values.
+        """
+
+        data = pagedResult.get("data")
+
+        if not data:  # result is not actually paged
+            yield pagedResult
+            return
+
+        yield data
 
         while(True):
-            nextPage = response.get("paging", {}).get("next")
+            nextPage = pagedResult.get("paging", {}).get("next")
             if not nextPage:
                 break
 
-            response = self._raw_request(nextPage)
-            yield response
+            pagedResult = self._raw_request(nextPage)
+            yield pagedResult.get('data')
+
+    def _paged_request(
+            self, path, args=None):
+        """
+        Generator function for API responses with embedded paging URLs.
+        """
+
+        response = self.request(path, args)
+        return self.paginate(response)
 
     def _raw_request(
             self, url, args=None, post_args=None, files=None, method="GET"):
-        """Fetches the given url.
+        """
+        Fetches the given url.
 
         We translate args to a valid query string. If post_args is
         given, we send a POST request to the given path with the given
         arguments.
-
         """
 
         args = args or {}
