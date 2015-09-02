@@ -120,13 +120,13 @@ class GraphAPI(object):
 
     def get_connections(self, id, connection_name, **args):
         """Fetchs the connections for given object."""
+        endpoint = self.version + "/" + id + "/" + connection_name
+
         paging = args.pop("paging", False)
         if paging:
-            return self._paged_request(
-                self.version + "/" + id + "/" + connection_name, args)
+            return self._paged_request(endpoint, args)
         else:
-            return self.request(
-                self.version + "/" + id + "/" + connection_name, args)
+            return self.request(endpoint, args)
 
     def put_object(self, parent_object, connection_name, **data):
         """Writes the given object to the graph, connected to the given parent.
