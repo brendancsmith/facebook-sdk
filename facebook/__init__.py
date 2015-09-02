@@ -244,8 +244,7 @@ class GraphAPI(object):
 
         data = pagedResult.get("data")
 
-        if not data:  # result is not actually paged
-            yield pagedResult
+        if len(data) == 0:  # result is empty
             return
 
         yield data
